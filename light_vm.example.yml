@@ -1,0 +1,80 @@
+# light_vm configuration
+# Copy this file to light_vm.yml and edit to match your setup.
+
+global:
+  scrape_interval: 15s      # How often to scrape targets (default: 15s)
+  scrape_timeout: 10s       # HTTP timeout per scrape (default: 10s)
+  retention: 3d             # How long to keep data (default: 3d)
+  listen_address: ":9090"   # Web UI and API listen address
+
+storage:
+  path: "./light_vm.db"     # SQLite database file
+  wal_mode: true            # WAL mode for better concurrent reads
+
+# Prometheus targets to scrape
+targets:
+  - name: "api-server"
+    url: "http://localhost:8080/metrics"
+    scrape_interval: 10s    # Override global interval
+    retention: 1d           # Per-target retention (overrides global)
+    labels:
+      env: "production"
+      service: "api"
+
+  - name: "worker"
+    url: "http://localhost:8081/metrics"
+    labels:
+      env: "production"
+      service: "worker"
+
+# Dashboard definitions
+dashboards:
+  - name: "API Latency"
+    ui_refresh: 5s          # How often the UI polls for new data
+    rescrape_interval: 5m   # Full data refetch interval (clears incremental buffer)
+    time_range: 5m
+    panels:
+      - title: "Request Latency (p50 / p95 / p99)"
+        type: "timeseries"
+        query:
+          metric: "http_request_duration_seconds"
+          type: "histogram"
+          percentiles: [0.5, 0.95, 0.99]
+          target: "api-server"
+          label_display: ["quantile"]   # Only show these labels in legend
+        y_axis:
+          unit: "seconds"
+          min: 0
+          side: 1                       # 1=left (default), 2=right
+
+      - title: "Request Rate by Status"
+        type: "timeseries"
+        query:
+          metric: "http_requests_total"
+          type: "counter"
+          target: "api-server"
+          group_by: ["method", "status"]
+        y_axis:
+          unit: "ops/s"
+
+  - name: "System"
+    ui_refresh: 10s
+    time_range: 1h
+    panels:
+      - title: "Memory Usage"
+        type: "timeseries"
+        query:
+          metric: "process_resident_memory_bytes"
+          type: "gauge"
+          target: "*"
+        y_axis:
+          unit: "bytes"
+
+      - title: "Goroutines"
+        type: "timeseries"
+        query:
+          metric: "go_goroutines"
+          type: "gauge"
+          target: "*"
+        y_axis:
+          unit: "none"
