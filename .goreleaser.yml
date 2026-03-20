@@ -39,34 +39,34 @@ archives:
 
 dockers:
   - image_templates:
-      - "ghcr.io/{{ .Env.GITHUB_REPOSITORY }}:{{ .Version }}-amd64"
+      - "ghcr.io/piyushkumar-1/light-vm:{{ .Version }}-amd64"
     use: buildx
     build_flag_templates:
       - "--platform=linux/amd64"
-      - "--label=org.opencontainers.image.source=https://github.com/{{ .Env.GITHUB_REPOSITORY }}"
+      - "--label=org.opencontainers.image.source=https://github.com/piyushKumar-1/light-vm"
       - "--label=org.opencontainers.image.version={{ .Version }}"
     goarch: amd64
     dockerfile: Dockerfile.goreleaser
 
   - image_templates:
-      - "ghcr.io/{{ .Env.GITHUB_REPOSITORY }}:{{ .Version }}-arm64"
+      - "ghcr.io/piyushkumar-1/light-vm:{{ .Version }}-arm64"
     use: buildx
     build_flag_templates:
       - "--platform=linux/arm64"
-      - "--label=org.opencontainers.image.source=https://github.com/{{ .Env.GITHUB_REPOSITORY }}"
+      - "--label=org.opencontainers.image.source=https://github.com/piyushKumar-1/light-vm"
       - "--label=org.opencontainers.image.version={{ .Version }}"
     goarch: arm64
     dockerfile: Dockerfile.goreleaser
 
 docker_manifests:
-  - name_template: "ghcr.io/{{ .Env.GITHUB_REPOSITORY }}:{{ .Version }}"
+  - name_template: "ghcr.io/piyushkumar-1/light-vm:{{ .Version }}"
     image_templates:
-      - "ghcr.io/{{ .Env.GITHUB_REPOSITORY }}:{{ .Version }}-amd64"
-      - "ghcr.io/{{ .Env.GITHUB_REPOSITORY }}:{{ .Version }}-arm64"
-  - name_template: "ghcr.io/{{ .Env.GITHUB_REPOSITORY }}:latest"
+      - "ghcr.io/piyushkumar-1/light-vm:{{ .Version }}-amd64"
+      - "ghcr.io/piyushkumar-1/light-vm:{{ .Version }}-arm64"
+  - name_template: "ghcr.io/piyushkumar-1/light-vm:latest"
     image_templates:
-      - "ghcr.io/{{ .Env.GITHUB_REPOSITORY }}:{{ .Version }}-amd64"
-      - "ghcr.io/{{ .Env.GITHUB_REPOSITORY }}:{{ .Version }}-arm64"
+      - "ghcr.io/piyushkumar-1/light-vm:{{ .Version }}-amd64"
+      - "ghcr.io/piyushkumar-1/light-vm:{{ .Version }}-arm64"
 
 checksum:
   name_template: "checksums.txt"
