@@ -9,9 +9,11 @@ interface PanelProps {
   refreshMs: number
   rescrapeMs: number
   paused: boolean
+  onEdit?: () => void
+  onView?: () => void
 }
 
-export function Panel({ panel, timeRangeSeconds, refreshMs, rescrapeMs, paused }: PanelProps) {
+export function Panel({ panel, timeRangeSeconds, refreshMs, rescrapeMs, paused, onEdit, onView }: PanelProps) {
   const { alignedData, seriesCfg, hasData } = useIncrementalData(
     panel.query,
     timeRangeSeconds,
@@ -44,6 +46,20 @@ export function Panel({ panel, timeRangeSeconds, refreshMs, rescrapeMs, paused }
         <span className="panel-title">{panel.title}</span>
         {panel.query.type && (
           <span className="panel-type-badge">{panel.query.type}</span>
+        )}
+        {(onView || onEdit) && (
+          <div className="panel-actions">
+            {onView && (
+              <button className="panel-action-btn" onClick={onView} title="View panel">
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M2 3h12v10H2z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/><path d="M5 8h6M5 10.5h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" opacity="0.5"/></svg>
+              </button>
+            )}
+            {onEdit && (
+              <button className="panel-action-btn" onClick={onEdit} title="Edit panel">
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M11.5 1.5l3 3L5 14H2v-3L11.5 1.5z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/></svg>
+              </button>
+            )}
+          </div>
         )}
       </div>
       <div className="panel-body" ref={bodyRef}>

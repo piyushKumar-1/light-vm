@@ -43,6 +43,7 @@ type Storage interface {
 	WriteSamples(ctx context.Context, samples []Sample) error
 	QueryRange(ctx context.Context, params QueryParams) ([]TimeSeries, error)
 	ListMetrics(ctx context.Context, target string) ([]MetricMeta, error)
+	LabelValues(ctx context.Context, metricName, target, labelName string) ([]string, error)
 	Prune(ctx context.Context, olderThan time.Time) (int64, error)
 	PruneTarget(ctx context.Context, target string, olderThan time.Time) (int64, error)
 	Close() error

@@ -81,7 +81,6 @@ export function DashboardEditPage({ id, navigate }: DashboardEditPageProps) {
 
   const addPanel = () => {
     const panels = assignDefaultGridPos(config.panels)
-    // Find next available Y position
     let maxY = 0
     for (const p of panels) {
       if (p.grid_pos) {
@@ -104,7 +103,6 @@ export function DashboardEditPage({ id, navigate }: DashboardEditPageProps) {
   const updatePanel = (index: number, panel: PanelConfig) => {
     setConfig(prev => {
       const panels = [...prev.panels]
-      // Preserve existing grid_pos if the editor doesn't provide one
       if (!panel.grid_pos && panels[index]?.grid_pos) {
         panel = { ...panel, grid_pos: panels[index].grid_pos }
       }
@@ -137,7 +135,16 @@ export function DashboardEditPage({ id, navigate }: DashboardEditPageProps) {
     })
   }, [])
 
-  if (loading) return <div className="loading">Loading...</div>
+  if (loading) {
+    return (
+      <div className="edit-page">
+        <div className="view-skeleton">
+          <div className="skeleton-bar skeleton-title" />
+          <div className="skeleton-bar" style={{height: 200}} />
+        </div>
+      </div>
+    )
+  }
 
   const panels = assignDefaultGridPos(config.panels)
 
@@ -152,53 +159,96 @@ export function DashboardEditPage({ id, navigate }: DashboardEditPageProps) {
   }))
 
   return (
-    <div className="edit-page">
+    <div className="edit-page fade-in">
+      {/* Toolbar */}
       <div className="edit-toolbar">
-        <button className="btn btn-sm" onClick={() => navigate(id ? `#/view/${id}` : '#/')}>
-          &#8592; Cancel
-        </button>
-        <h2>{id ? 'Edit Dashboard' : 'New Dashboard'}</h2>
-        <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
-          {saving ? 'Saving...' : 'Save'}
-        </button>
-      </div>
-
-      {error && <div className="edit-error">{error}</div>}
-
-      <div className="edit-form">
-        <div className="form-group">
-          <label>Name</label>
-          <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Dashboard name" />
+        <div className="edit-toolbar-left">
+          <button className="btn btn-ghost btn-sm btn-icon" onClick={() => navigate(id ? `#/view/${id}` : '#/')} title="Cancel">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          </button>
+          <div className="view-breadcrumb">
+            <span className="view-breadcrumb-root" onClick={() => navigate('#/')}>Dashboards</span>
+            <span className="view-breadcrumb-sep">/</span>
+            <h2>{id ? name || 'Edit' : 'New Dashboard'}</h2>
+          </div>
         </div>
-        <div className="form-group">
-          <label>Description</label>
-          <input type="text" value={description} onChange={e => setDescription(e.target.value)} placeholder="Optional description" />
-        </div>
-        <div className="form-row">
-          <div className="form-group">
-            <label>UI Refresh</label>
-            <input type="text" value={config.ui_refresh} onChange={e => setConfig(c => ({ ...c, ui_refresh: e.target.value }))} placeholder="5s" />
-          </div>
-          <div className="form-group">
-            <label>Rescrape Interval</label>
-            <input type="text" value={config.rescrape_interval} onChange={e => setConfig(c => ({ ...c, rescrape_interval: e.target.value }))} placeholder="5m" />
-          </div>
-          <div className="form-group">
-            <label>Time Range</label>
-            <input type="text" value={config.time_range} onChange={e => setConfig(c => ({ ...c, time_range: e.target.value }))} placeholder="1h" />
-          </div>
+        <div className="edit-toolbar-right">
+          <button className="btn btn-ghost btn-sm" onClick={() => navigate(id ? `#/view/${id}` : '#/')}>Cancel</button>
+          <button className="btn btn-primary btn-sm" onClick={handleSave} disabled={saving}>
+            {saving ? (
+              <><span className="login-spinner" style={{width: 12, height: 12, borderWidth: 1.5}} /> Saving...</>
+            ) : (
+              <><svg width="14" height="14" viewBox="0 0 16 16" fill="none" style={{marginRight: 2}}><path d="M3 8l3 3 7-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg> Save</>
+            )}
+          </button>
         </div>
       </div>
 
-      <div className="panels-section">
-        <div className="panels-header">
-          <h3>Panels ({config.panels.length})</h3>
-          <button className="btn btn-sm btn-primary" onClick={addPanel}>+ Add Panel</button>
+      {error && (
+        <div className="edit-error">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style={{marginRight: 6, flexShrink: 0}}><circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5"/><path d="M8 5v3M8 10.5v.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+          {error}
+        </div>
+      )}
+
+      {/* Dashboard Settings */}
+      <div className="edit-section">
+        <div className="edit-section-header">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 1a7 7 0 100 14A7 7 0 008 1z" stroke="currentColor" strokeWidth="1.3"/><path d="M8 4v4l2.5 1.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
+          Settings
+        </div>
+        <div className="edit-section-body">
+          <div className="form-row">
+            <div className="form-group" style={{flex: 2}}>
+              <label>Name</label>
+              <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Dashboard name" />
+            </div>
+            <div className="form-group" style={{flex: 3}}>
+              <label>Description</label>
+              <input type="text" value={description} onChange={e => setDescription(e.target.value)} placeholder="Optional description" />
+            </div>
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label>Refresh Interval</label>
+              <input type="text" value={config.ui_refresh} onChange={e => setConfig(c => ({ ...c, ui_refresh: e.target.value }))} placeholder="5s" />
+            </div>
+            <div className="form-group">
+              <label>Rescrape Interval</label>
+              <input type="text" value={config.rescrape_interval} onChange={e => setConfig(c => ({ ...c, rescrape_interval: e.target.value }))} placeholder="5m" />
+            </div>
+            <div className="form-group">
+              <label>Time Range</label>
+              <input type="text" value={config.time_range} onChange={e => setConfig(c => ({ ...c, time_range: e.target.value }))} placeholder="1h" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Panels */}
+      <div className="edit-section">
+        <div className="edit-section-header">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="14" height="14" rx="3" stroke="currentColor" strokeWidth="1.3"/><path d="M4 8h2v3H4zM7 5h2v6H7zM10 3h2v8h-2z" fill="currentColor" opacity="0.5"/></svg>
+          Panels
+          <span className="edit-section-badge">{config.panels.length}</span>
+          <div style={{flex: 1}} />
+          <button className="btn btn-primary btn-sm" onClick={addPanel}>
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" style={{marginRight: 3}}><path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+            Add Panel
+          </button>
         </div>
 
         {config.panels.length === 0 ? (
-          <div className="empty-state">
-            <p>No panels yet. Add a panel to start building your dashboard.</p>
+          <div className="edit-empty-panels">
+            <div className="empty-icon">
+              <svg width="40" height="40" viewBox="0 0 48 48" fill="none">
+                <rect x="6" y="6" width="36" height="36" rx="8" stroke="currentColor" strokeWidth="1.5" opacity="0.3"/>
+                <path d="M24 18v12M18 24h12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" opacity="0.4"/>
+              </svg>
+            </div>
+            <p className="empty-title">No panels yet</p>
+            <p className="empty-desc">Add a panel to start building your dashboard</p>
+            <button className="btn btn-primary btn-sm" onClick={addPanel}>Add your first panel</button>
           </div>
         ) : (
           <div className="grid-edit-container" ref={containerRef}>
@@ -219,18 +269,27 @@ export function DashboardEditPage({ id, navigate }: DashboardEditPageProps) {
               {panels.map((panel, i) => (
                 <div key={String(i)} className="grid-edit-item">
                   <div className="grid-panel-header">
-                    <span className="grid-panel-drag" title="Drag to reposition">&#9776;</span>
+                    <span className="grid-panel-drag" title="Drag to reposition">
+                      <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><circle cx="5" cy="4" r="1.5" fill="currentColor"/><circle cx="11" cy="4" r="1.5" fill="currentColor"/><circle cx="5" cy="8" r="1.5" fill="currentColor"/><circle cx="11" cy="8" r="1.5" fill="currentColor"/><circle cx="5" cy="12" r="1.5" fill="currentColor"/><circle cx="11" cy="12" r="1.5" fill="currentColor"/></svg>
+                    </span>
                     <span className="grid-panel-title">{panel.title}</span>
                     <span className="grid-panel-size">
-                      {panel.grid_pos?.w}x{panel.grid_pos?.h}
+                      {panel.grid_pos?.w}&times;{panel.grid_pos?.h}
                     </span>
                     <div className="grid-panel-actions">
-                      <button className="btn btn-xs" onClick={() => setEditingPanel(i)}>Edit</button>
-                      <button className="btn btn-xs btn-danger" onClick={() => removePanel(i)}>Remove</button>
+                      <button className="btn btn-ghost btn-xs" onClick={() => setEditingPanel(i)}>
+                        <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M11.5 1.5l3 3L5 14H2v-3L11.5 1.5z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/></svg>
+                        Edit
+                      </button>
+                      <button className="btn btn-ghost btn-xs btn-danger" onClick={() => removePanel(i)}>
+                        <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M3 4h10M6 4V3h4v1M5 4v8.5a.5.5 0 00.5.5h5a.5.5 0 00.5-.5V4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      </button>
                     </div>
                   </div>
                   <div className="grid-panel-meta">
-                    {panel.query.metric || 'no metric'} &middot; {panel.query.type} &middot; {panel.query.target || 'all targets'}
+                    <span className="grid-panel-metric">{panel.query.metric || 'no metric'}</span>
+                    <span className="grid-panel-type-badge">{panel.query.type}</span>
+                    <span className="grid-panel-target">{panel.query.target || 'all'}</span>
                   </div>
                 </div>
               ))}

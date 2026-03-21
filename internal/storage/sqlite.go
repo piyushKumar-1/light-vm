@@ -284,6 +284,51 @@ func (s *SQLiteStore) ListMetrics(ctx context.Context, target string) ([]MetricM
 	return metas, rows.Err()
 }
 
+func (s *SQLiteStore) LabelValues(ctx context.Context, metricName, target, labelName string) ([]string, error) {
+	// Look at samples from the last hour to find distinct values for a given label
+	cutoff := time.Now().Add(-1 * time.Hour).UnixMilli()
+
+	query := `SELECT DISTINCT labels_json FROM samples
+	          WHERE metric_name = ? AND timestamp >= ?`
+	args := []any{metricName, cutoff}
+
+	if target != "" && target != "*" {
+		query += ` AND target = ?`
+		args = append(args, target)
+	}
+
+	rows, err := s.reader.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	seen := make(map[string]bool)
+	for rows.Next() {
+		var labelsJSON string
+		if err := rows.Scan(&labelsJSON); err != nil {
+			return nil, err
+		}
+		var labels map[string]string
+		if err := json.Unmarshal([]byte(labelsJSON), &labels); err != nil {
+			continue
+		}
+		if v, ok := labels[labelName]; ok && v != "" {
+			seen[v] = true
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	result := make([]string, 0, len(seen))
+	for v := range seen {
+		result = append(result, v)
+	}
+	sort.Strings(result)
+	return result, nil
+}
+
 func (s *SQLiteStore) Prune(ctx context.Context, olderThan time.Time) (int64, error) {
 	res, err := s.writer.ExecContext(ctx,
 		`DELETE FROM samples WHERE timestamp < ?`, olderThan.UnixMilli())
@@ -348,6 +393,18 @@ func matchLabels(labels, matchers map[string]string) bool {
 		if strings.HasPrefix(pattern, "~") {
 			matched, err := regexp.MatchString(pattern[1:], v)
 			if err != nil || !matched {
+				return false
+			}
+		} else if strings.Contains(pattern, "|") {
+			// Multi-value OR match: "GET|POST" matches "GET" or "POST"
+			found := false
+			for _, p := range strings.Split(pattern, "|") {
+				if v == p {
+					found = true
+					break
+				}
+			}
+			if !found {
 				return false
 			}
 		} else if v != pattern {

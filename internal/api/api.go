@@ -48,6 +48,7 @@ func NewServer(cfg *config.Config, store *storage.SQLiteStore, mgr *scraper.Mana
 			r.Get("/query_range", s.handleQueryRange)
 			r.Get("/targets", s.handleTargets)
 			r.Get("/metrics", s.handleListMetrics)
+			r.Get("/label_values", s.handleLabelValues)
 
 			// Dashboard CRUD
 			r.Get("/dashboards", s.handleListDashboards)

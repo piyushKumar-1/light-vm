@@ -9,7 +9,7 @@ WORKING_DIR="/var/lib/light_vm"
 TEMP_DIR=$(mktemp -d)
 
 echo "Downloading light_vm from ${RELEASE_URL}..."
-curl -fSL "$RELEASE_URL" | tar xz -C "$TEMP_DIR"
+curl -fSL -H "Cache-Control: no-cache, no-store" -H "Pragma: no-cache" "$RELEASE_URL" | tar xz -C "$TEMP_DIR"
 
 echo "Installing binary to ${INSTALL_PATH}..."
 rm -f "$INSTALL_PATH"

@@ -1,14 +1,17 @@
 import { useState, useEffect, useCallback } from 'react'
 
 export interface Route {
-  page: 'login' | 'list' | 'view' | 'edit' | 'new'
+  page: 'login' | 'list' | 'view' | 'edit' | 'new' | 'panel'
   id?: string
+  panelIdx?: number
 }
 
 function parseHash(): Route {
   const hash = window.location.hash || '#/'
   if (hash === '#/login') return { page: 'login' }
   if (hash === '#/new') return { page: 'new' }
+  const panelMatch = hash.match(/^#\/view\/(.+)\/panel\/(\d+)$/)
+  if (panelMatch) return { page: 'panel', id: panelMatch[1], panelIdx: parseInt(panelMatch[2], 10) }
   const viewMatch = hash.match(/^#\/view\/(.+)$/)
   if (viewMatch) return { page: 'view', id: viewMatch[1] }
   const editMatch = hash.match(/^#\/edit\/(.+)$/)

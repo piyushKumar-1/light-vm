@@ -10,9 +10,11 @@ interface DashboardViewProps {
   dashboard: Dashboard
   timeRangeOverride?: number // seconds, from time-range selector
   paused: boolean
+  onEditPanel?: (index: number) => void
+  onViewPanel?: (index: number) => void
 }
 
-export function DashboardView({ dashboard, timeRangeOverride, paused }: DashboardViewProps) {
+export function DashboardView({ dashboard, timeRangeOverride, paused, onEditPanel, onViewPanel }: DashboardViewProps) {
   const cfg = dashboard.config
   const timeRangeSeconds = timeRangeOverride ?? parseDurationSeconds(cfg.time_range)
   const refreshMs = parseDuration(cfg.ui_refresh)
@@ -70,6 +72,8 @@ export function DashboardView({ dashboard, timeRangeOverride, paused }: Dashboar
               refreshMs={refreshMs}
               rescrapeMs={rescrapeMs}
               paused={paused}
+              onEdit={onEditPanel ? () => onEditPanel(i) : undefined}
+              onView={onViewPanel ? () => onViewPanel(i) : undefined}
             />
           </div>
         ))}

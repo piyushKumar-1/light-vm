@@ -110,6 +110,27 @@ func (s *Server) handleListMetrics(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, metas)
 }
 
+func (s *Server) handleLabelValues(w http.ResponseWriter, r *http.Request) {
+	metric := r.URL.Query().Get("metric")
+	if metric == "" {
+		http.Error(w, "metric parameter required", http.StatusBadRequest)
+		return
+	}
+	label := r.URL.Query().Get("label")
+	if label == "" {
+		http.Error(w, "label parameter required", http.StatusBadRequest)
+		return
+	}
+	target := r.URL.Query().Get("target")
+
+	values, err := s.store.LabelValues(r.Context(), metric, target, label)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, values)
+}
+
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, HealthResponse{
 		Status:        "ok",

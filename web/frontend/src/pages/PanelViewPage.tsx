@@ -1,30 +1,31 @@
 import { useState, useEffect, useCallback } from 'react'
 import { getDashboard, updateDashboard } from '../api/client'
 import type { Dashboard } from '../api/types'
-import { DashboardView } from '../components/DashboardView'
+import { Panel } from '../components/Panel'
 import { PanelEditor } from '../components/PanelEditor'
 import { TimeRangePicker } from '../components/TimeRangePicker'
-import { parseDurationSeconds } from '../lib/format'
+import { parseDuration, parseDurationSeconds } from '../lib/format'
 
-interface DashboardViewPageProps {
-  id: string
+interface PanelViewPageProps {
+  dashboardId: string
+  panelIdx: number
   navigate: (hash: string) => void
 }
 
-export function DashboardViewPage({ id, navigate }: DashboardViewPageProps) {
+export function PanelViewPage({ dashboardId, panelIdx, navigate }: PanelViewPageProps) {
   const [dashboard, setDashboard] = useState<Dashboard | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [timeRange, setTimeRange] = useState<number | null>(null)
-  const [refreshKey, setRefreshKey] = useState(0)
   const [paused, setPaused] = useState(false)
   const [spinning, setSpinning] = useState(false)
-  const [editingPanel, setEditingPanel] = useState<number | null>(null)
+  const [refreshKey, setRefreshKey] = useState(0)
+  const [editing, setEditing] = useState(false)
 
   useEffect(() => {
-    getDashboard(id)
+    getDashboard(dashboardId)
       .then(setDashboard)
       .catch(e => setError(e.message))
-  }, [id])
+  }, [dashboardId])
 
   const handleRefresh = useCallback(() => {
     setSpinning(true)
@@ -32,53 +33,56 @@ export function DashboardViewPage({ id, navigate }: DashboardViewPageProps) {
     setTimeout(() => setSpinning(false), 600)
   }, [])
 
-  const handleSavePanel = async (idx: number, panel: Dashboard['config']['panels'][0]) => {
+  const handleSavePanel = async (panel: typeof dashboard extends null ? never : Dashboard['config']['panels'][0]) => {
     if (!dashboard) return
     const panels = [...dashboard.config.panels]
-    if (!panel.grid_pos && panels[idx]?.grid_pos) {
-      panel = { ...panel, grid_pos: panels[idx].grid_pos }
+    if (!panel.grid_pos && panels[panelIdx]?.grid_pos) {
+      panel = { ...panel, grid_pos: panels[panelIdx].grid_pos }
     }
-    panels[idx] = panel
+    panels[panelIdx] = panel
     const newConfig = { ...dashboard.config, panels }
     try {
-      await updateDashboard(id, { config: newConfig })
+      await updateDashboard(dashboardId, { config: newConfig })
       setDashboard({ ...dashboard, config: newConfig })
-      setEditingPanel(null)
+      setEditing(false)
       setRefreshKey(k => k + 1)
-    } catch {
-      // keep editor open on error
+    } catch (e: any) {
+      setError(e.message)
     }
   }
 
-  if (error) return <div className="error">Failed to load dashboard: {error}</div>
+  if (error) return <div className="error">Error: {error}</div>
   if (!dashboard) {
     return (
       <div className="view-page">
         <div className="view-skeleton">
           <div className="skeleton-bar skeleton-title" />
-          <div className="skeleton-bar skeleton-toolbar" />
-          <div className="skeleton-panels">
-            <div className="skeleton-panel" />
-            <div className="skeleton-panel" />
-          </div>
+          <div className="skeleton-bar" style={{height: 400}} />
         </div>
       </div>
     )
   }
 
+  const panel = dashboard.config.panels[panelIdx]
+  if (!panel) return <div className="error">Panel not found</div>
+
   const effectiveTimeRange = timeRange ?? parseDurationSeconds(dashboard.config.time_range)
+  const refreshMs = parseDuration(dashboard.config.ui_refresh)
+  const rescrapeMs = parseDuration(dashboard.config.rescrape_interval)
 
   return (
     <div className="view-page fade-in">
       <div className="view-toolbar">
         <div className="view-toolbar-left">
-          <button className="btn btn-ghost btn-sm btn-icon" onClick={() => navigate('#/')} title="Back to dashboards">
+          <button className="btn btn-ghost btn-sm btn-icon" onClick={() => navigate(`#/view/${dashboardId}`)} title="Back to dashboard">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
           </button>
           <div className="view-breadcrumb">
             <span className="view-breadcrumb-root" onClick={() => navigate('#/')}>Dashboards</span>
             <span className="view-breadcrumb-sep">/</span>
-            <h2>{dashboard.name}</h2>
+            <span className="view-breadcrumb-root" onClick={() => navigate(`#/view/${dashboardId}`)}>{dashboard.name}</span>
+            <span className="view-breadcrumb-sep">/</span>
+            <h2>{panel.title}</h2>
           </div>
         </div>
         <div className="view-toolbar-center">
@@ -104,25 +108,26 @@ export function DashboardViewPage({ id, navigate }: DashboardViewPageProps) {
             )}
           </button>
           {!paused && <span className="auto-refresh-dot" title="Auto-refreshing" />}
-          <button className="btn btn-sm" onClick={() => navigate(`#/edit/${id}`)}>
+          <button className="btn btn-sm" onClick={() => setEditing(true)}>
             <svg width="13" height="13" viewBox="0 0 16 16" fill="none" style={{marginRight: 4}}><path d="M11.5 1.5l3 3L5 14H2v-3L11.5 1.5z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/></svg>
             Edit
           </button>
         </div>
       </div>
-      <DashboardView
-        key={`${id}-${refreshKey}`}
-        dashboard={dashboard}
-        timeRangeOverride={timeRange ?? undefined}
-        paused={paused}
-        onEditPanel={idx => setEditingPanel(idx)}
-        onViewPanel={idx => navigate(`#/view/${id}/panel/${idx}`)}
-      />
-      {editingPanel !== null && dashboard.config.panels[editingPanel] && (
+      <div className="panel-focus" key={refreshKey}>
+        <Panel
+          panel={panel}
+          timeRangeSeconds={effectiveTimeRange}
+          refreshMs={refreshMs}
+          rescrapeMs={rescrapeMs}
+          paused={paused}
+        />
+      </div>
+      {editing && (
         <PanelEditor
-          panel={dashboard.config.panels[editingPanel]}
-          onSave={panel => handleSavePanel(editingPanel, panel)}
-          onCancel={() => setEditingPanel(null)}
+          panel={panel}
+          onSave={handleSavePanel}
+          onCancel={() => setEditing(false)}
         />
       )}
     </div>

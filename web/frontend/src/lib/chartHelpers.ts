@@ -1,19 +1,29 @@
 import type { TimeSeries } from '../api/types'
 
 export const COLORS = [
-  '#58a6ff', '#f0883e', '#56d364', '#f85149', '#bc8cff',
-  '#f778ba', '#79c0ff', '#d29922', '#7ee787', '#ffa657',
+  '#34d399', '#f0883e', '#60a5fa', '#f85149', '#c084fc',
+  '#f778ba', '#38bdf8', '#d29922', '#7ee787', '#ffa657',
 ]
 
 export function buildLabel(labels: Record<string, string>, labelDisplay?: string[]): string {
-  const keys = labelDisplay && labelDisplay.length > 0
-    ? labelDisplay
-    : Object.keys(labels).filter(k => !k.startsWith('__')).sort()
-
+  if (labelDisplay && labelDisplay.length > 0) {
+    const first = labelDisplay[0]
+    // Template mode: "Requests {{method}}" or "{{instance}} - {{path}}"
+    if (first.includes('{{')) {
+      const result = first.replace(/\{\{(\w+)\}\}/g, (_, key) => labels[key] ?? key)
+      return result || 'value'
+    }
+    // Key list mode: ["method", "path"] → "method=GET, path=/api"
+    const parts = labelDisplay
+      .filter(k => labels[k] !== undefined)
+      .map(k => `${k}=${labels[k]}`)
+    return parts.join(', ') || 'value'
+  }
+  // Default: all non-internal labels
+  const keys = Object.keys(labels).filter(k => !k.startsWith('__')).sort()
   const parts = keys
     .filter(k => labels[k] !== undefined)
     .map(k => `${k}=${labels[k]}`)
-
   return parts.join(', ') || 'value'
 }
 

@@ -6,6 +6,7 @@ import { LoginPage } from './pages/LoginPage'
 import { DashboardListPage } from './pages/DashboardListPage'
 import { DashboardViewPage } from './pages/DashboardViewPage'
 import { DashboardEditPage } from './pages/DashboardEditPage'
+import { PanelViewPage } from './pages/PanelViewPage'
 
 export function App() {
   const { route, navigate } = useRouter()
@@ -35,6 +36,8 @@ export function App() {
         return <DashboardListPage navigate={navigate} />
       case 'view':
         return <DashboardViewPage id={route.id!} navigate={navigate} />
+      case 'panel':
+        return <PanelViewPage dashboardId={route.id!} panelIdx={route.panelIdx!} navigate={navigate} />
       case 'edit':
         return <DashboardEditPage id={route.id} navigate={navigate} />
       case 'new':

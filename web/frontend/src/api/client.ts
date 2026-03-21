@@ -115,6 +115,11 @@ export async function getTargets(): Promise<TargetStatus[]> {
   return fetchJSON('/api/v1/targets')
 }
 
+export async function getLabelValues(metric: string, target: string, label: string): Promise<string[]> {
+  const params = new URLSearchParams({ metric, target: target || '*', label })
+  return fetchJSON(`/api/v1/label_values?${params}`)
+}
+
 export async function getHealth(): Promise<HealthResponse> {
   return fetchJSON('/api/v1/health')
 }
