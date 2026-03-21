@@ -13,13 +13,25 @@ export function formatValue(v: number | null | undefined, unit: string): string 
     case 'percent':
       return (v * 100).toFixed(1) + '%'
     case 'ops/s':
+    case 'req/s':
+    case 'errors/s':
       if (v >= 1000) return (v / 1000).toFixed(1) + 'k/s'
       return v.toFixed(1) + '/s'
-    default:
-      if (Math.abs(v) >= 1e6) return (v / 1e6).toFixed(1) + 'M'
-      if (Math.abs(v) >= 1e3) return (v / 1e3).toFixed(1) + 'k'
-      if (Number.isInteger(v)) return v.toString()
-      return v.toFixed(2)
+    case 'ms':
+      if (v >= 1000) return (v / 1000).toFixed(2) + 's'
+      return v.toFixed(1) + 'ms'
+    case 'connections':
+      if (v >= 1e6) return (v / 1e6).toFixed(1) + 'M'
+      if (v >= 1e3) return (v / 1e3).toFixed(1) + 'k'
+      return v.toFixed(0)
+    default: {
+      // Custom unit: format the number with SI suffixes and append the unit
+      const suffix = unit ? ' ' + unit : ''
+      if (Math.abs(v) >= 1e6) return (v / 1e6).toFixed(1) + 'M' + suffix
+      if (Math.abs(v) >= 1e3) return (v / 1e3).toFixed(1) + 'k' + suffix
+      if (Number.isInteger(v)) return v.toString() + suffix
+      return v.toFixed(2) + suffix
+    }
   }
 }
 

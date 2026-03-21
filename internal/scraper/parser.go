@@ -101,7 +101,7 @@ func Parse(body []byte, targetName string, extraLabels map[string]string) ([]sto
 						Labels:     pLabels,
 						Value:      val,
 						Timestamp:  ts,
-						MetricType: "gauge",
+						MetricType: "histogram",
 					})
 				}
 

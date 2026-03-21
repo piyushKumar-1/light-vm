@@ -9,15 +9,16 @@ import { Panel } from './Panel'
 interface DashboardViewProps {
   dashboard: Dashboard
   timeRangeOverride?: number // seconds, from time-range selector
+  refreshMsOverride?: number // ms, from refresh interval selector
   paused: boolean
   onEditPanel?: (index: number) => void
   onViewPanel?: (index: number) => void
 }
 
-export function DashboardView({ dashboard, timeRangeOverride, paused, onEditPanel, onViewPanel }: DashboardViewProps) {
+export function DashboardView({ dashboard, timeRangeOverride, refreshMsOverride, paused, onEditPanel, onViewPanel }: DashboardViewProps) {
   const cfg = dashboard.config
   const timeRangeSeconds = timeRangeOverride ?? parseDurationSeconds(cfg.time_range)
-  const refreshMs = parseDuration(cfg.ui_refresh)
+  const refreshMs = refreshMsOverride ?? parseDuration(cfg.ui_refresh)
   const rescrapeMs = parseDuration(cfg.rescrape_interval)
   const containerRef = useRef<HTMLDivElement>(null)
   const [width, setWidth] = useState(1200)

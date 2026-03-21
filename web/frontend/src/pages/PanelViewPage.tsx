@@ -20,6 +20,7 @@ export function PanelViewPage({ dashboardId, panelIdx, navigate }: PanelViewPage
   const [spinning, setSpinning] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
   const [editing, setEditing] = useState(false)
+  const [refreshInterval, setRefreshInterval] = useState<number | null>(null)
 
   useEffect(() => {
     getDashboard(dashboardId)
@@ -42,7 +43,7 @@ export function PanelViewPage({ dashboardId, panelIdx, navigate }: PanelViewPage
     panels[panelIdx] = panel
     const newConfig = { ...dashboard.config, panels }
     try {
-      await updateDashboard(dashboardId, { config: newConfig })
+      await updateDashboard(dashboardId, { name: dashboard.name, description: dashboard.description, config: newConfig })
       setDashboard({ ...dashboard, config: newConfig })
       setEditing(false)
       setRefreshKey(k => k + 1)
@@ -67,7 +68,8 @@ export function PanelViewPage({ dashboardId, panelIdx, navigate }: PanelViewPage
   if (!panel) return <div className="error">Panel not found</div>
 
   const effectiveTimeRange = timeRange ?? parseDurationSeconds(dashboard.config.time_range)
-  const refreshMs = parseDuration(dashboard.config.ui_refresh)
+  const defaultRefreshMs = parseDuration(dashboard.config.ui_refresh)
+  const effectiveRefreshMs = refreshInterval ?? defaultRefreshMs
   const rescrapeMs = parseDuration(dashboard.config.rescrape_interval)
 
   return (
@@ -89,6 +91,19 @@ export function PanelViewPage({ dashboardId, panelIdx, navigate }: PanelViewPage
           <TimeRangePicker value={effectiveTimeRange} onChange={setTimeRange} />
         </div>
         <div className="view-toolbar-right">
+          <select
+            className="refresh-select"
+            value={effectiveRefreshMs}
+            onChange={e => setRefreshInterval(Number(e.target.value))}
+            title="Auto-refresh interval"
+          >
+            <option value={1000}>1s</option>
+            <option value={2000}>2s</option>
+            <option value={5000}>5s</option>
+            <option value={10000}>10s</option>
+            <option value={30000}>30s</option>
+            <option value={60000}>1m</option>
+          </select>
           <button
             className={`btn btn-ghost btn-sm btn-icon ${spinning ? 'spin-once' : ''}`}
             onClick={handleRefresh}
@@ -118,7 +133,7 @@ export function PanelViewPage({ dashboardId, panelIdx, navigate }: PanelViewPage
         <Panel
           panel={panel}
           timeRangeSeconds={effectiveTimeRange}
-          refreshMs={refreshMs}
+          refreshMs={effectiveRefreshMs}
           rescrapeMs={rescrapeMs}
           paused={paused}
         />

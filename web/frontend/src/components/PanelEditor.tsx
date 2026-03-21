@@ -207,13 +207,23 @@ export function PanelEditor({ panel, onSave, onCancel }: PanelEditorProps) {
             <div className="form-row">
               <div className="form-group">
                 <label>Unit</label>
-                <select value={unit} onChange={e => setUnit(e.target.value)}>
-                  <option value="">None</option>
-                  <option value="seconds">Seconds</option>
-                  <option value="bytes">Bytes</option>
-                  <option value="percent">Percent</option>
-                  <option value="ops/s">Ops/s</option>
-                </select>
+                <input
+                  type="text"
+                  list="unit-suggestions"
+                  value={unit}
+                  onChange={e => setUnit(e.target.value)}
+                  placeholder="e.g. seconds, bytes, req/s"
+                />
+                <datalist id="unit-suggestions">
+                  <option value="seconds" />
+                  <option value="bytes" />
+                  <option value="percent" />
+                  <option value="ops/s" />
+                  <option value="req/s" />
+                  <option value="ms" />
+                  <option value="connections" />
+                  <option value="errors/s" />
+                </datalist>
               </div>
               <div className="form-group">
                 <label>Min</label>

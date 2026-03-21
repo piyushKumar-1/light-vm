@@ -79,6 +79,17 @@ func (s *Server) handleQueryRange(w http.ResponseWriter, r *http.Request) {
 			series[i].Datapoints = computeRate(series[i].Datapoints)
 		}
 	case "histogram":
+		// Always filter to only quantile-labeled series for histograms
+		if percStr := r.URL.Query().Get("percentiles"); percStr != "" {
+			requested := parsePercentiles(percStr)
+			series = filterByQuantiles(series, requested)
+		} else {
+			// No specific percentiles requested — show all available quantiles
+			series = filterHasQuantile(series)
+		}
+	default:
+		// For any type: if percentiles are requested, filter by quantile label.
+		// This handles gauge panels that are actually pre-computed histogram quantiles.
 		if percStr := r.URL.Query().Get("percentiles"); percStr != "" {
 			requested := parsePercentiles(percStr)
 			series = filterByQuantiles(series, requested)
@@ -206,6 +217,17 @@ func filterByQuantiles(series []storage.TimeSeries, quantiles []float64) []stora
 	var filtered []storage.TimeSeries
 	for _, ts := range series {
 		if q, ok := ts.Labels["quantile"]; ok && wanted[q] {
+			filtered = append(filtered, ts)
+		}
+	}
+	return filtered
+}
+
+// filterHasQuantile keeps only series that have a "quantile" label.
+func filterHasQuantile(series []storage.TimeSeries) []storage.TimeSeries {
+	var filtered []storage.TimeSeries
+	for _, ts := range series {
+		if _, ok := ts.Labels["quantile"]; ok {
 			filtered = append(filtered, ts)
 		}
 	}

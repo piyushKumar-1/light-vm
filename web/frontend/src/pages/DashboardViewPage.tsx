@@ -4,7 +4,7 @@ import type { Dashboard } from '../api/types'
 import { DashboardView } from '../components/DashboardView'
 import { PanelEditor } from '../components/PanelEditor'
 import { TimeRangePicker } from '../components/TimeRangePicker'
-import { parseDurationSeconds } from '../lib/format'
+import { parseDuration, parseDurationSeconds } from '../lib/format'
 
 interface DashboardViewPageProps {
   id: string
@@ -19,6 +19,7 @@ export function DashboardViewPage({ id, navigate }: DashboardViewPageProps) {
   const [paused, setPaused] = useState(false)
   const [spinning, setSpinning] = useState(false)
   const [editingPanel, setEditingPanel] = useState<number | null>(null)
+  const [refreshInterval, setRefreshInterval] = useState<number | null>(null) // ms override
 
   useEffect(() => {
     getDashboard(id)
@@ -41,7 +42,7 @@ export function DashboardViewPage({ id, navigate }: DashboardViewPageProps) {
     panels[idx] = panel
     const newConfig = { ...dashboard.config, panels }
     try {
-      await updateDashboard(id, { config: newConfig })
+      await updateDashboard(id, { name: dashboard.name, description: dashboard.description, config: newConfig })
       setDashboard({ ...dashboard, config: newConfig })
       setEditingPanel(null)
       setRefreshKey(k => k + 1)
@@ -67,6 +68,8 @@ export function DashboardViewPage({ id, navigate }: DashboardViewPageProps) {
   }
 
   const effectiveTimeRange = timeRange ?? parseDurationSeconds(dashboard.config.time_range)
+  const defaultRefreshMs = parseDuration(dashboard.config.ui_refresh)
+  const effectiveRefreshMs = refreshInterval ?? defaultRefreshMs
 
   return (
     <div className="view-page fade-in">
@@ -85,6 +88,19 @@ export function DashboardViewPage({ id, navigate }: DashboardViewPageProps) {
           <TimeRangePicker value={effectiveTimeRange} onChange={setTimeRange} />
         </div>
         <div className="view-toolbar-right">
+          <select
+            className="refresh-select"
+            value={effectiveRefreshMs}
+            onChange={e => setRefreshInterval(Number(e.target.value))}
+            title="Auto-refresh interval"
+          >
+            <option value={1000}>1s</option>
+            <option value={2000}>2s</option>
+            <option value={5000}>5s</option>
+            <option value={10000}>10s</option>
+            <option value={30000}>30s</option>
+            <option value={60000}>1m</option>
+          </select>
           <button
             className={`btn btn-ghost btn-sm btn-icon ${spinning ? 'spin-once' : ''}`}
             onClick={handleRefresh}
@@ -114,6 +130,7 @@ export function DashboardViewPage({ id, navigate }: DashboardViewPageProps) {
         key={`${id}-${refreshKey}`}
         dashboard={dashboard}
         timeRangeOverride={timeRange ?? undefined}
+        refreshMsOverride={effectiveRefreshMs}
         paused={paused}
         onEditPanel={idx => setEditingPanel(idx)}
         onViewPanel={idx => navigate(`#/view/${id}/panel/${idx}`)}
