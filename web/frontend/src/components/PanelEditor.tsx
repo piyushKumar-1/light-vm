@@ -23,6 +23,8 @@ export function PanelEditor({ panel, onSave, onCancel }: PanelEditorProps) {
   const [yMin, setYMin] = useState(panel.y_axis.min?.toString() || '')
   const [yMax, setYMax] = useState(panel.y_axis.max?.toString() || '')
   const [ySide, setYSide] = useState(panel.y_axis.side || 1)
+  const [gridW, setGridW] = useState(panel.grid_pos?.w ?? 6)
+  const [gridH, setGridH] = useState(panel.grid_pos?.h ?? 2)
 
   const handleSave = () => {
     const p: PanelConfig = {
@@ -44,6 +46,12 @@ export function PanelEditor({ panel, onSave, onCancel }: PanelEditorProps) {
         min: yMin ? parseFloat(yMin) : undefined,
         max: yMax ? parseFloat(yMax) : undefined,
         side: ySide,
+      },
+      grid_pos: {
+        x: panel.grid_pos?.x ?? 0,
+        y: panel.grid_pos?.y ?? 0,
+        w: gridW,
+        h: gridH,
       },
     }
     onSave(p)
@@ -114,6 +122,27 @@ export function PanelEditor({ panel, onSave, onCancel }: PanelEditorProps) {
               <select value={ySide} onChange={e => setYSide(Number(e.target.value))}>
                 <option value={1}>Left</option>
                 <option value={2}>Right</option>
+              </select>
+            </div>
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label>Panel Width</label>
+              <select value={gridW} onChange={e => setGridW(Number(e.target.value))}>
+                <option value={3}>Quarter (3/12)</option>
+                <option value={4}>Third (4/12)</option>
+                <option value={6}>Half (6/12)</option>
+                <option value={8}>Two-thirds (8/12)</option>
+                <option value={12}>Full (12/12)</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Panel Height</label>
+              <select value={gridH} onChange={e => setGridH(Number(e.target.value))}>
+                <option value={1}>Short</option>
+                <option value={2}>Default</option>
+                <option value={3}>Tall</option>
+                <option value={4}>Extra Tall</option>
               </select>
             </div>
           </div>

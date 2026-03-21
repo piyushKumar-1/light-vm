@@ -26,7 +26,7 @@ func SeedDashboards(ctx context.Context, store *SQLiteStore, dashboards []config
 	for i, dc := range dashboards {
 		panels := make([]PanelBody, len(dc.Panels))
 		for j, p := range dc.Panels {
-			panels[j] = PanelBody{
+			pb := PanelBody{
 				Title: p.Title,
 				Type:  p.Type,
 				Query: QueryBody{
@@ -45,6 +45,15 @@ func SeedDashboards(ctx context.Context, store *SQLiteStore, dashboards []config
 					Side: p.YAxis.Side,
 				},
 			}
+			if p.GridPos != nil {
+				pb.GridPos = &GridPos{
+					X: p.GridPos.X,
+					Y: p.GridPos.Y,
+					W: p.GridPos.W,
+					H: p.GridPos.H,
+				}
+			}
+			panels[j] = pb
 		}
 
 		d := &Dashboard{

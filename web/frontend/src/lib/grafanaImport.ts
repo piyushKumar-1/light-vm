@@ -17,6 +17,7 @@ interface GrafanaPanel {
   type?: string
   title?: string
   targets?: GrafanaTarget[]
+  gridPos?: { x: number; y: number; w: number; h: number }
   fieldConfig?: {
     defaults?: {
       unit?: string
@@ -233,7 +234,25 @@ function convertPanel(gp: GrafanaPanel): {
 
     const title = multi && i > 0 ? `${panelTitle} (${target.refId || String.fromCharCode(65 + i)})` : panelTitle
 
-    panels.push({ title, type: 'timeseries', query, y_axis: yAxis })
+    const pc: PanelConfig = { title, type: 'timeseries', query, y_axis: yAxis }
+
+    // Convert Grafana 24-col gridPos to 12-col
+    if (gp.gridPos) {
+      const gx = gp.gridPos.x
+      const gw = gp.gridPos.w
+      pc.grid_pos = {
+        x: Math.round(gx / 2),
+        y: gp.gridPos.y,
+        w: Math.max(2, Math.round(gw / 2)),
+        h: Math.max(1, Math.round(gp.gridPos.h / 4)),
+      }
+      // Offset subsequent panels from a multi-target split
+      if (multi && i > 0 && pc.grid_pos) {
+        pc.grid_pos = { ...pc.grid_pos, y: pc.grid_pos.y + i }
+      }
+    }
+
+    panels.push(pc)
   }
 
   if (panels.length === 0) {

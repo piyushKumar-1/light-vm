@@ -1,19 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { getDashboard } from '../api/client'
 import type { Dashboard } from '../api/types'
 import { DashboardView } from '../components/DashboardView'
+import { TimeRangePicker } from '../components/TimeRangePicker'
 import { parseDurationSeconds } from '../lib/format'
-
-const TIME_RANGES = [
-  { label: '5m', value: 300 },
-  { label: '15m', value: 900 },
-  { label: '30m', value: 1800 },
-  { label: '1h', value: 3600 },
-  { label: '3h', value: 10800 },
-  { label: '6h', value: 21600 },
-  { label: '12h', value: 43200 },
-  { label: '24h', value: 86400 },
-]
 
 interface DashboardViewPageProps {
   id: string
@@ -25,6 +15,8 @@ export function DashboardViewPage({ id, navigate }: DashboardViewPageProps) {
   const [error, setError] = useState<string | null>(null)
   const [timeRange, setTimeRange] = useState<number | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [paused, setPaused] = useState(false)
+  const [spinning, setSpinning] = useState(false)
 
   useEffect(() => {
     getDashboard(id)
@@ -32,38 +24,77 @@ export function DashboardViewPage({ id, navigate }: DashboardViewPageProps) {
       .catch(e => setError(e.message))
   }, [id])
 
+  const handleRefresh = useCallback(() => {
+    setSpinning(true)
+    setRefreshKey(k => k + 1)
+    setTimeout(() => setSpinning(false), 600)
+  }, [])
+
   if (error) return <div className="error">Failed to load dashboard: {error}</div>
-  if (!dashboard) return <div className="loading">Loading...</div>
+  if (!dashboard) {
+    return (
+      <div className="view-page">
+        <div className="view-skeleton">
+          <div className="skeleton-bar skeleton-title" />
+          <div className="skeleton-bar skeleton-toolbar" />
+          <div className="skeleton-panels">
+            <div className="skeleton-panel" />
+            <div className="skeleton-panel" />
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   const effectiveTimeRange = timeRange ?? parseDurationSeconds(dashboard.config.time_range)
 
   return (
-    <div className="view-page">
+    <div className="view-page fade-in">
       <div className="view-toolbar">
         <div className="view-toolbar-left">
-          <button className="btn btn-sm" onClick={() => navigate('#/')}>&#8592; Back</button>
-          <h2>{dashboard.name}</h2>
-          {dashboard.description && <span className="view-desc">{dashboard.description}</span>}
+          <button className="btn btn-ghost btn-sm btn-icon" onClick={() => navigate('#/')} title="Back to dashboards">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          </button>
+          <div className="view-breadcrumb">
+            <span className="view-breadcrumb-root" onClick={() => navigate('#/')}>Dashboards</span>
+            <span className="view-breadcrumb-sep">/</span>
+            <h2>{dashboard.name}</h2>
+          </div>
+        </div>
+        <div className="view-toolbar-center">
+          <TimeRangePicker value={effectiveTimeRange} onChange={setTimeRange} />
         </div>
         <div className="view-toolbar-right">
-          <select
-            className="time-select"
-            value={effectiveTimeRange}
-            onChange={e => setTimeRange(Number(e.target.value))}
+          <button
+            className={`btn btn-ghost btn-sm btn-icon ${spinning ? 'spin-once' : ''}`}
+            onClick={handleRefresh}
+            title="Refresh"
           >
-            {TIME_RANGES.map(tr => (
-              <option key={tr.value} value={tr.value}>{tr.label}</option>
-            ))}
-          </select>
-          <button className="btn btn-sm" onClick={() => setRefreshKey(k => k + 1)} title="Refresh">&#x21bb;</button>
-          <button className="btn btn-sm" onClick={() => navigate(`#/edit/${id}`)}>Edit</button>
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M13.65 2.35A8 8 0 1 0 16 8h-2a6 6 0 1 1-1.76-4.24L10 6h6V0l-2.35 2.35z" fill="currentColor" opacity="0.9"/></svg>
+          </button>
+          <button
+            className={`btn btn-sm ${paused ? 'btn-paused' : 'btn-ghost'}`}
+            onClick={() => setPaused(p => !p)}
+            title={paused ? 'Resume auto-refresh' : 'Pause auto-refresh'}
+          >
+            {paused ? (
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M4 2l10 6-10 6V2z" fill="currentColor"/></svg>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="3" y="2" width="4" height="12" rx="1" fill="currentColor"/><rect x="9" y="2" width="4" height="12" rx="1" fill="currentColor"/></svg>
+            )}
+          </button>
+          {!paused && <span className="auto-refresh-dot" title="Auto-refreshing" />}
+          <button className="btn btn-sm" onClick={() => navigate(`#/edit/${id}`)}>
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" style={{marginRight: 4}}><path d="M11.5 1.5l3 3L5 14H2v-3L11.5 1.5z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/></svg>
+            Edit
+          </button>
         </div>
       </div>
       <DashboardView
         key={`${id}-${refreshKey}`}
         dashboard={dashboard}
         timeRangeOverride={timeRange ?? undefined}
-        paused={false}
+        paused={paused}
       />
     </div>
   )

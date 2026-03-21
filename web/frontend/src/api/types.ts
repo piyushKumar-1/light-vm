@@ -15,11 +15,19 @@ export interface DashboardBody {
   panels: PanelConfig[]
 }
 
+export interface GridPos {
+  x: number
+  y: number
+  w: number
+  h: number
+}
+
 export interface PanelConfig {
   title: string
   type: string
   query: QueryConfig
   y_axis: YAxisConfig
+  grid_pos?: GridPos
 }
 
 export interface QueryConfig {

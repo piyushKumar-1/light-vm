@@ -22,11 +22,19 @@ type DashboardBody struct {
 	Panels           []PanelBody `json:"panels"`
 }
 
+type GridPos struct {
+	X int `json:"x"`
+	Y int `json:"y"`
+	W int `json:"w"`
+	H int `json:"h"`
+}
+
 type PanelBody struct {
-	Title string    `json:"title"`
-	Type  string    `json:"type"`
-	Query QueryBody `json:"query"`
-	YAxis YAxisBody `json:"y_axis"`
+	Title   string    `json:"title"`
+	Type    string    `json:"type"`
+	Query   QueryBody `json:"query"`
+	YAxis   YAxisBody `json:"y_axis"`
+	GridPos *GridPos  `json:"grid_pos,omitempty"`
 }
 
 type QueryBody struct {

@@ -1,6 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { GridLayout, type Layout } from 'react-grid-layout'
+import 'react-grid-layout/css/styles.css'
 import { getDashboard, createDashboard, updateDashboard } from '../api/client'
 import type { Dashboard, DashboardBody, PanelConfig } from '../api/types'
+import { assignDefaultGridPos } from '../lib/gridDefaults'
 import { PanelEditor } from '../components/PanelEditor'
 
 interface DashboardEditPageProps {
@@ -23,6 +26,21 @@ export function DashboardEditPage({ id, navigate }: DashboardEditPageProps) {
   const [saving, setSaving] = useState(false)
   const [editingPanel, setEditingPanel] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [width, setWidth] = useState(1200)
+
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    setWidth(el.clientWidth)
+    const obs = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        setWidth(entry.contentRect.width)
+      }
+    })
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [])
 
   useEffect(() => {
     if (!id) return
@@ -30,7 +48,10 @@ export function DashboardEditPage({ id, navigate }: DashboardEditPageProps) {
       .then(d => {
         setName(d.name)
         setDescription(d.description)
-        setConfig(d.config)
+        setConfig({
+          ...d.config,
+          panels: assignDefaultGridPos(d.config.panels),
+        })
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
@@ -59,19 +80,34 @@ export function DashboardEditPage({ id, navigate }: DashboardEditPageProps) {
   }
 
   const addPanel = () => {
+    const panels = assignDefaultGridPos(config.panels)
+    // Find next available Y position
+    let maxY = 0
+    for (const p of panels) {
+      if (p.grid_pos) {
+        const bottom = p.grid_pos.y + p.grid_pos.h
+        if (bottom > maxY) maxY = bottom
+      }
+    }
     const panel: PanelConfig = {
       title: 'New Panel',
       type: 'timeseries',
       query: { metric: '', type: 'gauge', target: '' },
       y_axis: { unit: '' },
+      grid_pos: { x: 0, y: maxY, w: 6, h: 2 },
     }
-    setConfig(prev => ({ ...prev, panels: [...prev.panels, panel] }))
-    setEditingPanel(config.panels.length)
+    const newPanels = [...panels, panel]
+    setConfig(prev => ({ ...prev, panels: newPanels }))
+    setEditingPanel(newPanels.length - 1)
   }
 
   const updatePanel = (index: number, panel: PanelConfig) => {
     setConfig(prev => {
       const panels = [...prev.panels]
+      // Preserve existing grid_pos if the editor doesn't provide one
+      if (!panel.grid_pos && panels[index]?.grid_pos) {
+        panel = { ...panel, grid_pos: panels[index].grid_pos }
+      }
       panels[index] = panel
       return { ...prev, panels }
     })
@@ -85,17 +121,35 @@ export function DashboardEditPage({ id, navigate }: DashboardEditPageProps) {
     setEditingPanel(null)
   }
 
-  const movePanel = (index: number, dir: -1 | 1) => {
-    const target = index + dir
-    if (target < 0 || target >= config.panels.length) return
+  const handleLayoutChange = useCallback((layout: Layout) => {
     setConfig(prev => {
       const panels = [...prev.panels]
-      ;[panels[index], panels[target]] = [panels[target], panels[index]]
+      for (const item of layout) {
+        const idx = parseInt(item.i, 10)
+        if (idx >= 0 && idx < panels.length) {
+          panels[idx] = {
+            ...panels[idx],
+            grid_pos: { x: item.x, y: item.y, w: item.w, h: item.h },
+          }
+        }
+      }
       return { ...prev, panels }
     })
-  }
+  }, [])
 
   if (loading) return <div className="loading">Loading...</div>
+
+  const panels = assignDefaultGridPos(config.panels)
+
+  const layout = panels.map((p, i) => ({
+    i: String(i),
+    x: p.grid_pos!.x,
+    y: p.grid_pos!.y,
+    w: p.grid_pos!.w,
+    h: p.grid_pos!.h,
+    minW: 2,
+    minH: 1,
+  }))
 
   return (
     <div className="edit-page">
@@ -147,23 +201,40 @@ export function DashboardEditPage({ id, navigate }: DashboardEditPageProps) {
             <p>No panels yet. Add a panel to start building your dashboard.</p>
           </div>
         ) : (
-          <div className="panel-list">
-            {config.panels.map((panel, i) => (
-              <div key={i} className="panel-list-item">
-                <div className="panel-list-info" onClick={() => setEditingPanel(i)}>
-                  <span className="panel-list-title">{panel.title}</span>
-                  <span className="panel-list-meta">
+          <div className="grid-edit-container" ref={containerRef}>
+            <GridLayout
+              layout={layout}
+              width={width}
+              gridConfig={{
+                cols: 12,
+                rowHeight: 120,
+                margin: [14, 14] as const,
+                containerPadding: [0, 0] as const,
+                maxRows: Infinity,
+              }}
+              dragConfig={{ enabled: true, bounded: false, handle: '.grid-panel-drag', threshold: 3 }}
+              resizeConfig={{ enabled: true, handles: ['se'] }}
+              onLayoutChange={handleLayoutChange}
+            >
+              {panels.map((panel, i) => (
+                <div key={String(i)} className="grid-edit-item">
+                  <div className="grid-panel-header">
+                    <span className="grid-panel-drag" title="Drag to reposition">&#9776;</span>
+                    <span className="grid-panel-title">{panel.title}</span>
+                    <span className="grid-panel-size">
+                      {panel.grid_pos?.w}x{panel.grid_pos?.h}
+                    </span>
+                    <div className="grid-panel-actions">
+                      <button className="btn btn-xs" onClick={() => setEditingPanel(i)}>Edit</button>
+                      <button className="btn btn-xs btn-danger" onClick={() => removePanel(i)}>Remove</button>
+                    </div>
+                  </div>
+                  <div className="grid-panel-meta">
                     {panel.query.metric || 'no metric'} &middot; {panel.query.type} &middot; {panel.query.target || 'all targets'}
-                  </span>
+                  </div>
                 </div>
-                <div className="panel-list-actions">
-                  <button className="btn btn-xs" onClick={() => movePanel(i, -1)} disabled={i === 0}>&#8593;</button>
-                  <button className="btn btn-xs" onClick={() => movePanel(i, 1)} disabled={i === config.panels.length - 1}>&#8595;</button>
-                  <button className="btn btn-xs" onClick={() => setEditingPanel(i)}>Edit</button>
-                  <button className="btn btn-xs btn-danger" onClick={() => removePanel(i)}>Remove</button>
-                </div>
-              </div>
-            ))}
+              ))}
+            </GridLayout>
           </div>
         )}
       </div>

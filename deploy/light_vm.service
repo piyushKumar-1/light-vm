@@ -1,0 +1,15 @@
+[Unit]
+Description=light_vm metrics collector
+After=network.target
+
+[Service]
+Type=simple
+User=lightvm
+ExecStartPre=+/bin/bash /opt/light_vm/scripts/update_light_vm.sh
+ExecStart=/usr/local/bin/light_vm -config /etc/light_vm/light_vm.yml
+Restart=always
+RestartSec=5
+WorkingDirectory=/var/lib/light_vm
+
+[Install]
+WantedBy=multi-user.target

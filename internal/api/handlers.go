@@ -33,11 +33,31 @@ func (s *Server) handleQueryRange(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Auto-compute step for downsampling based on time range
+	var step time.Duration
+	if stepStr := r.URL.Query().Get("step"); stepStr != "" {
+		if v, err := strconv.ParseFloat(stepStr, 64); err == nil && v > 0 {
+			step = time.Duration(v * float64(time.Second))
+		}
+	}
+	if step == 0 {
+		// Auto step: aim for ~1000 data points max
+		rangeSeconds := end.Sub(start).Seconds()
+		if rangeSeconds > 3600 { // only downsample for ranges > 1h
+			autoStep := rangeSeconds / 1000.0
+			if autoStep < 5 {
+				autoStep = 5
+			}
+			step = time.Duration(autoStep * float64(time.Second))
+		}
+	}
+
 	params := storage.QueryParams{
 		MetricName: metric,
 		Target:     target,
 		Start:      start,
 		End:        end,
+		Step:       step,
 	}
 
 	if labelsStr := r.URL.Query().Get("labels"); labelsStr != "" {

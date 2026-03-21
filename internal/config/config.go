@@ -57,11 +57,19 @@ type DashboardConfig struct {
 	Panels            []PanelConfig `yaml:"panels" json:"panels"`
 }
 
+type GridPos struct {
+	X int `yaml:"x" json:"x"`
+	Y int `yaml:"y" json:"y"`
+	W int `yaml:"w" json:"w"`
+	H int `yaml:"h" json:"h"`
+}
+
 type PanelConfig struct {
-	Title string      `yaml:"title" json:"title"`
-	Type  string      `yaml:"type" json:"type"`
-	Query QueryConfig `yaml:"query" json:"query"`
-	YAxis YAxisConfig `yaml:"y_axis" json:"y_axis"`
+	Title   string      `yaml:"title" json:"title"`
+	Type    string      `yaml:"type" json:"type"`
+	Query   QueryConfig `yaml:"query" json:"query"`
+	YAxis   YAxisConfig `yaml:"y_axis" json:"y_axis"`
+	GridPos *GridPos    `yaml:"grid_pos,omitempty" json:"grid_pos,omitempty"`
 }
 
 type QueryConfig struct {

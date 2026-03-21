@@ -21,6 +21,7 @@ type QueryParams struct {
 	Target     string            // __target__ label value, "*" for all
 	Start      time.Time
 	End        time.Time
+	Step       time.Duration // if > 0, downsample by averaging over step-sized buckets
 }
 
 // TimeSeries is a query result: a labeled set of ordered data points.

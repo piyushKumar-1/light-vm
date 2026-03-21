@@ -128,9 +128,17 @@ func (s *SQLiteStore) WriteSamples(ctx context.Context, samples []Sample) error 
 }
 
 func (s *SQLiteStore) QueryRange(ctx context.Context, params QueryParams) ([]TimeSeries, error) {
+	startMs := params.Start.UnixMilli()
+	endMs := params.End.UnixMilli()
+
+	// When step > 0, use SQL-level downsampling via GROUP BY time bucket
+	if params.Step > 0 {
+		return s.queryRangeDownsampled(ctx, params, startMs, endMs)
+	}
+
 	query := `SELECT labels_json, value, timestamp FROM samples
 	          WHERE metric_name = ? AND timestamp >= ? AND timestamp <= ?`
-	args := []any{params.MetricName, params.Start.UnixMilli(), params.End.UnixMilli()}
+	args := []any{params.MetricName, startMs, endMs}
 
 	if params.Target != "" && params.Target != "*" {
 		query += ` AND target = ?`
@@ -171,6 +179,69 @@ func (s *SQLiteStore) QueryRange(ctx context.Context, params QueryParams) ([]Tim
 		}
 		ts.Datapoints = append(ts.Datapoints,
 			[2]float64{float64(tsMs) / 1000.0, value})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	result := make([]TimeSeries, 0, len(seriesMap))
+	for _, ts := range seriesMap {
+		result = append(result, *ts)
+	}
+	return result, nil
+}
+
+func (s *SQLiteStore) queryRangeDownsampled(ctx context.Context, params QueryParams, startMs, endMs int64) ([]TimeSeries, error) {
+	stepMs := params.Step.Milliseconds()
+
+	query := `SELECT labels_hash, labels_json, AVG(value) AS avg_val,
+	                 (timestamp / ?) * ? AS ts_bucket
+	          FROM samples
+	          WHERE metric_name = ? AND timestamp >= ? AND timestamp <= ?`
+	args := []any{stepMs, stepMs, params.MetricName, startMs, endMs}
+
+	if params.Target != "" && params.Target != "*" {
+		query += ` AND target = ?`
+		args = append(args, params.Target)
+	}
+	query += ` GROUP BY labels_hash, ts_bucket ORDER BY ts_bucket ASC`
+
+	rows, err := s.reader.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	seriesMap := make(map[string]*TimeSeries)
+	labelsCache := make(map[string]map[string]string) // labels_hash -> parsed labels
+
+	for rows.Next() {
+		var labelsHash, labelsJSON string
+		var value float64
+		var tsBucket int64
+		if err := rows.Scan(&labelsHash, &labelsJSON, &value, &tsBucket); err != nil {
+			return nil, err
+		}
+
+		labels, ok := labelsCache[labelsHash]
+		if !ok {
+			if err := json.Unmarshal([]byte(labelsJSON), &labels); err != nil {
+				continue
+			}
+			labelsCache[labelsHash] = labels
+		}
+
+		if !matchLabels(labels, params.LabelMatch) {
+			continue
+		}
+
+		ts, ok := seriesMap[labelsHash]
+		if !ok {
+			ts = &TimeSeries{Labels: labels}
+			seriesMap[labelsHash] = ts
+		}
+		ts.Datapoints = append(ts.Datapoints,
+			[2]float64{float64(tsBucket) / 1000.0, value})
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

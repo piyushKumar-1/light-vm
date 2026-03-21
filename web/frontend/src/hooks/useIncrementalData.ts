@@ -43,6 +43,13 @@ export function useIncrementalData(
     const start = lastTsRef.current !== undefined ? lastTsRef.current : windowStart
     const end = now
 
+    // Compute step: for ranges > 1h, aim for ~1000 data points
+    const rangeSec = timeRangeSeconds
+    let step: number | undefined
+    if (rangeSec > 3600) {
+      step = Math.max(5, rangeSec / 1000)
+    }
+
     try {
       const resp = await queryRange(
         query.metric,
@@ -53,6 +60,7 @@ export function useIncrementalData(
         query.labels,
         query.percentiles,
         lastTsRef.current, // since parameter for incremental
+        step,
       )
 
       const trimBefore = now - timeRangeSeconds
