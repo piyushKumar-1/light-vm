@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -19,15 +20,25 @@ type Server struct {
 	scraper   *scraper.Manager
 	router    chi.Router
 	startTime time.Time
+
+	// queryCache stores recent query results to avoid recomputation on polls.
+	queryCache   map[string]queryCacheEntry
+	queryCacheMu sync.Mutex
+}
+
+type queryCacheEntry struct {
+	data      []byte
+	expiresAt time.Time
 }
 
 // NewServer wires up routes and returns an http.Handler.
 func NewServer(cfg *config.Config, store *storage.SQLiteStore, mgr *scraper.Manager, staticHandler http.Handler) *Server {
 	s := &Server{
-		cfg:       cfg,
-		store:     store,
-		scraper:   mgr,
-		startTime: time.Now(),
+		cfg:        cfg,
+		store:      store,
+		scraper:    mgr,
+		startTime:  time.Now(),
+		queryCache: make(map[string]queryCacheEntry),
 	}
 
 	r := chi.NewRouter()

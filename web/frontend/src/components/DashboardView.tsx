@@ -10,12 +10,14 @@ interface DashboardViewProps {
   dashboard: Dashboard
   timeRangeOverride?: number // seconds, from time-range selector
   refreshMsOverride?: number // ms, from refresh interval selector
+  absoluteRange?: { start: number; end: number }
   paused: boolean
   onEditPanel?: (index: number) => void
   onViewPanel?: (index: number) => void
+  onZoomSelect?: (startSec: number, endSec: number) => void
 }
 
-export function DashboardView({ dashboard, timeRangeOverride, refreshMsOverride, paused, onEditPanel, onViewPanel }: DashboardViewProps) {
+export function DashboardView({ dashboard, timeRangeOverride, refreshMsOverride, absoluteRange, paused, onEditPanel, onViewPanel, onZoomSelect }: DashboardViewProps) {
   const cfg = dashboard.config
   const timeRangeSeconds = timeRangeOverride ?? parseDurationSeconds(cfg.time_range)
   const refreshMs = refreshMsOverride ?? parseDuration(cfg.ui_refresh)
@@ -70,11 +72,13 @@ export function DashboardView({ dashboard, timeRangeOverride, refreshMsOverride,
             <Panel
               panel={panel}
               timeRangeSeconds={timeRangeSeconds}
+              absoluteRange={absoluteRange}
               refreshMs={refreshMs}
               rescrapeMs={rescrapeMs}
               paused={paused}
               onEdit={onEditPanel ? () => onEditPanel(i) : undefined}
               onView={onViewPanel ? () => onViewPanel(i) : undefined}
+              onZoomSelect={onZoomSelect}
             />
           </div>
         ))}

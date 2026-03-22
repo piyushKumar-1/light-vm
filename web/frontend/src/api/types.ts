@@ -54,6 +54,7 @@ export interface TimeSeries {
 
 export interface QueryRangeResponse {
   series: TimeSeries[]
+  truncated?: boolean
 }
 
 export interface HealthResponse {

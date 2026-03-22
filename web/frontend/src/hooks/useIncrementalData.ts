@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { queryRange } from '../api/client'
 import type { QueryConfig } from '../api/types'
-import { mergeSeriesData, bufferedToAligned, COLORS, buildLabel } from '../lib/chartHelpers'
+import { alignSeries, buildLabel, COLORS } from '../lib/chartHelpers'
 import type uPlot from 'uplot'
 
 export interface IncrementalDataResult {
@@ -14,109 +14,85 @@ export function useIncrementalData(
   query: QueryConfig,
   timeRangeSeconds: number,
   refreshMs: number,
-  rescrapeMs: number,
+  _rescrapeMs: number,
   paused: boolean,
+  absoluteRange?: { start: number; end: number },
 ): IncrementalDataResult {
-  const bufferRef = useRef(
-    new Map<string, { labels: Record<string, string>; points: Map<number, number> }>(),
-  )
-  const lastTsRef = useRef<number | undefined>(undefined)
-  const lastFullFetchRef = useRef<number>(0)
-
   const [alignedData, setAlignedData] = useState<uPlot.AlignedData | null>(null)
-  const [seriesCfg, setSeriesCfg] = useState<uPlot.Series[]>([{}]) // x-axis placeholder
+  const [seriesCfg, setSeriesCfg] = useState<uPlot.Series[]>([{}])
   const [hasData, setHasData] = useState(false)
 
-  const fetchAndMerge = useCallback(async () => {
-    const now = Math.floor(Date.now() / 1000)
-    const windowStart = now - timeRangeSeconds
+  const queryKey = `${query.metric}|${query.target}|${query.type}|${JSON.stringify(query.labels)}|${JSON.stringify(query.percentiles)}`
+  const absKey = absoluteRange ? `${absoluteRange.start}|${absoluteRange.end}` : ''
 
-    // Full rescrape: clear buffer periodically to avoid stale data accumulation
-    const rescrapeSeconds = rescrapeMs / 1000
-    const needsFullRefetch = (now - lastFullFetchRef.current) >= rescrapeSeconds
-    if (needsFullRefetch) {
-      bufferRef.current = new Map()
-      lastTsRef.current = undefined
-      lastFullFetchRef.current = now
-    }
+  // Reset state when query changes
+  useEffect(() => {
+    setAlignedData(null)
+    setSeriesCfg([{}])
+    setHasData(false)
+  }, [queryKey, absKey])
 
-    const start = lastTsRef.current !== undefined ? lastTsRef.current : windowStart
-    const end = now
+  // Fetch loop
+  useEffect(() => {
+    if (paused) return
+    let cancelled = false
 
-    // Compute step: for ranges > 1h, aim for ~1000 data points
-    const rangeSec = timeRangeSeconds
-    let step: number | undefined
-    if (rangeSec > 3600) {
-      step = Math.max(5, rangeSec / 1000)
-    }
-
-    try {
-      const resp = await queryRange(
-        query.metric,
-        query.target,
-        start,
-        end,
-        query.type,
-        query.labels,
-        query.percentiles,
-        lastTsRef.current, // since parameter for incremental
-        step,
-      )
-
-      const trimBefore = now - timeRangeSeconds
-      mergeSeriesData(bufferRef.current, resp.series, trimBefore)
-
-      // Track latest timestamp
-      for (const s of resp.series) {
-        for (const [ts] of s.datapoints) {
-          if (lastTsRef.current === undefined || ts > lastTsRef.current) {
-            lastTsRef.current = ts
-          }
-        }
+    const doFetch = async () => {
+      let start: number, end: number
+      if (absoluteRange) {
+        start = Math.floor(absoluteRange.start)
+        end = Math.floor(absoluteRange.end)
+      } else {
+        end = Math.floor(Date.now() / 1000)
+        start = end - timeRangeSeconds
       }
 
-      // Build aligned data
-      const { data, keys, labelsMap } = bufferedToAligned(bufferRef.current)
+      try {
+        const resp = await queryRange(
+          query.metric,
+          query.target,
+          start,
+          end,
+          query.type,
+          query.labels,
+          query.percentiles,
+        )
+        if (cancelled) return
+        if (!resp.series || resp.series.length === 0) return
 
-      if (data[0].length > 0) {
-        setAlignedData(data as uPlot.AlignedData)
-        setHasData(true)
+        const { data, seriesKeys } = alignSeries(resp.series)
+        if (data[0].length === 0) return
 
-        // Rebuild series config if key count changed
-        const newSeries: uPlot.Series[] = [{}]
-        keys.forEach((key, i) => {
-          const labels = labelsMap.get(key) || {}
-          newSeries.push({
+        const cfg: uPlot.Series[] = [{}]
+        for (let i = 0; i < seriesKeys.length; i++) {
+          const labels: Record<string, string> = JSON.parse(seriesKeys[i])
+          cfg.push({
             label: buildLabel(labels, query.label_display),
             stroke: COLORS[i % COLORS.length],
             width: 2,
           })
-        })
-        setSeriesCfg(newSeries)
+        }
+
+        setAlignedData(data as uPlot.AlignedData)
+        setSeriesCfg(cfg)
+        setHasData(true)
+      } catch (err) {
+        console.error(`[light_vm] query failed for ${query.metric}:`, err)
       }
-    } catch {
-      // Silently ignore fetch errors to keep showing stale data
     }
-  }, [query, timeRangeSeconds, rescrapeMs])
 
-  // Reset buffer when query changes
-  useEffect(() => {
-    bufferRef.current = new Map()
-    lastTsRef.current = undefined
-    lastFullFetchRef.current = 0
-    setAlignedData(null)
-    setSeriesCfg([{}])
-    setHasData(false)
-  }, [query.metric, query.target, query.type, JSON.stringify(query.labels)])
-
-  // Initial fetch + interval
-  useEffect(() => {
-    if (paused) return
-
-    fetchAndMerge()
-    const id = setInterval(fetchAndMerge, refreshMs)
-    return () => clearInterval(id)
-  }, [fetchAndMerge, refreshMs, paused])
+    doFetch()
+    // For absolute ranges (zoomed), fetch once then stop polling.
+    // The data is a fixed window, re-fetching won't produce new points.
+    if (!absoluteRange) {
+      const id = setInterval(doFetch, refreshMs)
+      return () => {
+        cancelled = true
+        clearInterval(id)
+      }
+    }
+    return () => { cancelled = true }
+  }, [queryKey, timeRangeSeconds, refreshMs, paused, absKey])
 
   return { alignedData, seriesCfg, hasData }
 }

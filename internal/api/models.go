@@ -4,7 +4,8 @@ import "github.com/piyushkumar-1/light_vm/internal/storage"
 
 // QueryRangeResponse wraps the time-series query result.
 type QueryRangeResponse struct {
-	Series []storage.TimeSeries `json:"series"`
+	Series    []storage.TimeSeries `json:"series"`
+	Truncated bool                 `json:"truncated,omitempty"`
 }
 
 // HealthResponse reports service health.

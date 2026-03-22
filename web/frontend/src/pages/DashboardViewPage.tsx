@@ -11,15 +11,24 @@ interface DashboardViewPageProps {
   navigate: (hash: string) => void
 }
 
+function formatAbsoluteRange(start: number, end: number): string {
+  const fmt = (ts: number) => {
+    const d = new Date(ts * 1000)
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  }
+  return `${fmt(start)} \u2013 ${fmt(end)}`
+}
+
 export function DashboardViewPage({ id, navigate }: DashboardViewPageProps) {
   const [dashboard, setDashboard] = useState<Dashboard | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [timeRange, setTimeRange] = useState<number | null>(null)
+  const [zoomedRange, setZoomedRange] = useState<{ start: number; end: number } | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
   const [paused, setPaused] = useState(false)
   const [spinning, setSpinning] = useState(false)
   const [editingPanel, setEditingPanel] = useState<number | null>(null)
-  const [refreshInterval, setRefreshInterval] = useState<number | null>(null) // ms override
+  const [refreshInterval, setRefreshInterval] = useState<number | null>(null)
 
   useEffect(() => {
     getDashboard(id)
@@ -31,6 +40,19 @@ export function DashboardViewPage({ id, navigate }: DashboardViewPageProps) {
     setSpinning(true)
     setRefreshKey(k => k + 1)
     setTimeout(() => setSpinning(false), 600)
+  }, [])
+
+  const handleZoomSelect = useCallback((startSec: number, endSec: number) => {
+    setZoomedRange({ start: startSec, end: endSec })
+  }, [])
+
+  const handleResetZoom = useCallback(() => {
+    setZoomedRange(null)
+  }, [])
+
+  const handleTimeRangeChange = useCallback((v: number) => {
+    setTimeRange(v)
+    setZoomedRange(null) // clear zoom when user picks a time range
   }, [])
 
   const handleSavePanel = async (idx: number, panel: Dashboard['config']['panels'][0]) => {
@@ -85,7 +107,17 @@ export function DashboardViewPage({ id, navigate }: DashboardViewPageProps) {
           </div>
         </div>
         <div className="view-toolbar-center">
-          <TimeRangePicker value={effectiveTimeRange} onChange={setTimeRange} />
+          {zoomedRange ? (
+            <button className="btn btn-sm btn-zoom-reset" onClick={handleResetZoom} title="Reset zoom to original time range">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" style={{marginRight: 4}}>
+                <path d="M1 1v5h5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M3.51 10a5 5 0 1 0 .74-5.36L1 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              <span className="zoom-range-label">{formatAbsoluteRange(zoomedRange.start, zoomedRange.end)}</span>
+            </button>
+          ) : (
+            <TimeRangePicker value={effectiveTimeRange} onChange={handleTimeRangeChange} />
+          )}
         </div>
         <div className="view-toolbar-right">
           <select
@@ -119,7 +151,7 @@ export function DashboardViewPage({ id, navigate }: DashboardViewPageProps) {
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="3" y="2" width="4" height="12" rx="1" fill="currentColor"/><rect x="9" y="2" width="4" height="12" rx="1" fill="currentColor"/></svg>
             )}
           </button>
-          {!paused && <span className="auto-refresh-dot" title="Auto-refreshing" />}
+          {!paused && !zoomedRange && <span className="auto-refresh-dot" title="Auto-refreshing" />}
           <button className="btn btn-sm" onClick={() => navigate(`#/edit/${id}`)}>
             <svg width="13" height="13" viewBox="0 0 16 16" fill="none" style={{marginRight: 4}}><path d="M11.5 1.5l3 3L5 14H2v-3L11.5 1.5z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/></svg>
             Edit
@@ -131,9 +163,11 @@ export function DashboardViewPage({ id, navigate }: DashboardViewPageProps) {
         dashboard={dashboard}
         timeRangeOverride={timeRange ?? undefined}
         refreshMsOverride={effectiveRefreshMs}
-        paused={paused}
+        absoluteRange={zoomedRange ?? undefined}
+        paused={paused || !!zoomedRange}
         onEditPanel={idx => setEditingPanel(idx)}
         onViewPanel={idx => navigate(`#/view/${id}/panel/${idx}`)}
+        onZoomSelect={handleZoomSelect}
       />
       {editingPanel !== null && dashboard.config.panels[editingPanel] && (
         <PanelEditor

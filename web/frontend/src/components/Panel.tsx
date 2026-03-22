@@ -1,32 +1,42 @@
-import { useRef, useState, useEffect } from 'react'
+import { useRef, useState, useEffect, useCallback } from 'react'
+import type uPlot from 'uplot'
 import type { PanelConfig } from '../api/types'
 import { useIncrementalData } from '../hooks/useIncrementalData'
 import { Chart } from './Chart'
+import { Legend } from './Legend'
 
 interface PanelProps {
   panel: PanelConfig
   timeRangeSeconds: number
+  absoluteRange?: { start: number; end: number }
   refreshMs: number
   rescrapeMs: number
   paused: boolean
   onEdit?: () => void
   onView?: () => void
+  onZoomSelect?: (startSec: number, endSec: number) => void
 }
 
-export function Panel({ panel, timeRangeSeconds, refreshMs, rescrapeMs, paused, onEdit, onView }: PanelProps) {
+export function Panel({ panel, timeRangeSeconds, absoluteRange, refreshMs, rescrapeMs, paused, onEdit, onView, onZoomSelect }: PanelProps) {
   const { alignedData, seriesCfg, hasData } = useIncrementalData(
     panel.query,
     timeRangeSeconds,
     refreshMs,
     rescrapeMs,
     paused,
+    absoluteRange,
   )
 
-  const bodyRef = useRef<HTMLDivElement>(null)
+  const chartAreaRef = useRef<HTMLDivElement>(null)
+  const uplotInstanceRef = useRef<uPlot | null>(null)
   const [chartHeight, setChartHeight] = useState(280)
 
+  const handleUplotReady = useCallback((u: uPlot | null) => {
+    uplotInstanceRef.current = u
+  }, [])
+
   useEffect(() => {
-    const el = bodyRef.current
+    const el = chartAreaRef.current
     if (!el) return
     const obs = new ResizeObserver(entries => {
       for (const entry of entries) {
@@ -36,9 +46,10 @@ export function Panel({ panel, timeRangeSeconds, refreshMs, rescrapeMs, paused, 
     })
     obs.observe(el)
     return () => obs.disconnect()
-  }, [])
+  }, [hasData])
 
   const isLoading = !hasData && !alignedData
+  const yAxisUnit = panel.y_axis?.unit || ''
 
   return (
     <div className="panel">
@@ -62,7 +73,7 @@ export function Panel({ panel, timeRangeSeconds, refreshMs, rescrapeMs, paused, 
           </div>
         )}
       </div>
-      <div className="panel-body" ref={bodyRef}>
+      <div className="panel-body">
         {isLoading ? (
           <div className="panel-skeleton">
             <div className="skeleton-chart">
@@ -77,15 +88,29 @@ export function Panel({ panel, timeRangeSeconds, refreshMs, rescrapeMs, paused, 
             </div>
           </div>
         ) : hasData && alignedData ? (
-          <Chart
-            data={alignedData}
-            series={seriesCfg}
-            yAxisUnit={panel.y_axis?.unit || ''}
-            yMin={panel.y_axis?.min}
-            yMax={panel.y_axis?.max}
-            yAxisSide={panel.y_axis?.side}
-            height={chartHeight}
-          />
+          <div className="panel-chart-row">
+            <div className="panel-chart-area" ref={chartAreaRef}>
+              <Chart
+                data={alignedData}
+                series={seriesCfg}
+                yAxisUnit={yAxisUnit}
+                yMin={panel.y_axis?.min}
+                yMax={panel.y_axis?.max}
+                yAxisSide={panel.y_axis?.side}
+                height={chartHeight}
+                onUplotReady={handleUplotReady}
+                onZoomSelect={onZoomSelect}
+              />
+            </div>
+            {seriesCfg.length > 1 && (
+              <Legend
+                series={seriesCfg}
+                uplotRef={uplotInstanceRef}
+                data={alignedData}
+                yAxisUnit={yAxisUnit}
+              />
+            )}
+          </div>
         ) : (
           <div className="no-data">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" opacity="0.4">

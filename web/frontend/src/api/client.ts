@@ -86,8 +86,6 @@ export async function queryRange(
   type: string,
   labels?: Record<string, string>,
   percentiles?: number[],
-  since?: number,
-  step?: number,
 ): Promise<QueryRangeResponse> {
   const params = new URLSearchParams({
     metric,
@@ -101,12 +99,6 @@ export async function queryRange(
   }
   if (percentiles && percentiles.length > 0) {
     params.set('percentiles', percentiles.join(','))
-  }
-  if (since !== undefined) {
-    params.set('since', since.toString())
-  }
-  if (step !== undefined && step > 0) {
-    params.set('step', step.toString())
   }
   return fetchJSON(`/api/v1/query_range?${params}`)
 }
